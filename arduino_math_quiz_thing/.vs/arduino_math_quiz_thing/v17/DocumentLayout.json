@@ -1,0 +1,54 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\diogu\\Desktop\\ua\\4_2\\IA\\arduino_math_quiz_thing\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A21446D8-370C-67E1-0FAF-CEA18582BC7C}|Assembly-CSharp.csproj|c:\\users\\diogu\\desktop\\ua\\4_2\\ia\\arduino_math_quiz_thing\\assets\\scripts\\quiz.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A21446D8-370C-67E1-0FAF-CEA18582BC7C}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\quiz.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A21446D8-370C-67E1-0FAF-CEA18582BC7C}|Assembly-CSharp.csproj|c:\\users\\diogu\\desktop\\ua\\4_2\\ia\\arduino_math_quiz_thing\\assets\\scripts\\quizdata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A21446D8-370C-67E1-0FAF-CEA18582BC7C}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\quizdata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "QuizData.cs",
+              "DocumentMoniker": "C:\\Users\\diogu\\Desktop\\ua\\4_2\\IA\\arduino_math_quiz_thing\\Assets\\Scripts\\QuizData.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\QuizData.cs",
+              "ToolTip": "C:\\Users\\diogu\\Desktop\\ua\\4_2\\IA\\arduino_math_quiz_thing\\Assets\\Scripts\\QuizData.cs",
+              "RelativeToolTip": "Assets\\Scripts\\QuizData.cs",
+              "ViewState": "AQIAABUAAAAAAAAAAAAAACoAAAAPAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-21T10:08:23.395Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Quiz.cs",
+              "DocumentMoniker": "C:\\Users\\diogu\\Desktop\\ua\\4_2\\IA\\arduino_math_quiz_thing\\Assets\\Scripts\\Quiz.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\Quiz.cs",
+              "ToolTip": "C:\\Users\\diogu\\Desktop\\ua\\4_2\\IA\\arduino_math_quiz_thing\\Assets\\Scripts\\Quiz.cs",
+              "RelativeToolTip": "Assets\\Scripts\\Quiz.cs",
+              "ViewState": "AQIAABwAAAAAAAAAAAAAADAAAAAUAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-21T09:39:22.475Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
