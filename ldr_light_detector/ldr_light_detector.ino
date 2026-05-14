@@ -1,95 +1,50 @@
-// LDR Laser Target Detection System
-// Detects significant light increases on 4 LDR sensors
+int button1Pin = 2;
+int button10Pin = 3;
+int number = 0;
 
-const int LDR_PINS[] = {A0, A1, A2, A3};  // Analog pins for LDRs
-const int NUM_LDRS = 4;
-
-// Detection settings
-const int THRESHOLD_DIFFERENCE = 150;  // How much higher than baseline to trigger
-const int SAMPLE_INTERVAL = 10;        // Milliseconds between readings
-const int BASELINE_SAMPLES = 50;       // Samples to average for baseline
-
-int baseline[NUM_LDRS];
-int currentValue[NUM_LDRS];
-bool wasTriggered[NUM_LDRS] = {false, false, false, false};
+int lastState1 = LOW;
+int lastState10 = LOW;
 
 void setup() {
+  // Using INPUT_PULLUP is safer if you don't have external resistors.
+  // Note: This inverts logic (LOW = pressed), but for this fix, 
+  // I'll assume you have external resistors and stay with INPUT.
+  pinMode(button1Pin, INPUT);
+  pinMode(button10Pin, INPUT);
+  
   Serial.begin(9600);
-  
-  for (int i = 0; i < NUM_LDRS; i++) {
-    pinMode(LDR_PINS[i], INPUT);
-  }
-  
-  Serial.println("Calibrating baselines... Keep lasers OFF");
-  delay(1000);
-  calibrateBaselines();
-  
-  Serial.println("Calibration complete. Ready for laser hits!");
-  Serial.println("----------------------------------------");
-  Serial.println("Time (ms)\tLDR\tValue\tBaseline\tDelta");
-  Serial.println("----------------------------------------");
+  Serial.print("Initial Value: ");
+  Serial.println(number);
 }
 
 void loop() {
-  unsigned long timestamp = millis();
-  
-  // Read all LDRs
-  for (int i = 0; i < NUM_LDRS; i++) {
-    currentValue[i] = analogRead(LDR_PINS[i]);
-  }
-  
-  // Check for significant increases
-  for (int i = 0; i < NUM_LDRS; i++) {
-    int delta = currentValue[i] - baseline[i];
-    
-    if (delta >= THRESHOLD_DIFFERENCE) {
-      if (!wasTriggered[i]) {
-        // New hit detected
-        wasTriggered[i] = true;
-        reportHit(timestamp, i, currentValue[i], delta);
-      }
-    } else {
-      // Reset trigger state when laser moves away
-      wasTriggered[i] = false;
-    }
-  }
-  
-  delay(SAMPLE_INTERVAL);
-}
+  // 1. Read current states
+  int currentState1 = digitalRead(button1Pin);
+  int currentState10 = digitalRead(button10Pin);
 
-void calibrateBaselines() {
-  long sums[NUM_LDRS] = {0, 0, 0, 0};
-  
-  for (int s = 0; s < BASELINE_SAMPLES; s++) {
-    for (int i = 0; i < NUM_LDRS; i++) {
-      sums[i] += analogRead(LDR_PINS[i]);
-    }
-    delay(10);
-  }
-  
-  Serial.println("\nBaseline values:");
-  for (int i = 0; i < NUM_LDRS; i++) {
-    baseline[i] = sums[i] / BASELINE_SAMPLES;
-    Serial.print("  LDR ");
-    Serial.print(i + 1);
-    Serial.print(" (Pin A");
-    Serial.print(i);
-    Serial.print("): ");
-    Serial.println(baseline[i]);
-  }
-  Serial.println();
-}
+  bool changed = false;
 
-void reportHit(unsigned long timestamp, int ldrIndex, int value, int delta) {
-  // TODO
+  // 2. Check for Button 1 (Rising Edge)
+  if (currentState1 == HIGH && lastState1 == LOW) {
+    number += 1;
+    changed = true;
+    delay(50); // Simple debouncing
+  }
 
-  Serial.print(timestamp);
-  Serial.print("\t\tLDR ");
-  Serial.print(ldrIndex + 1);
-  Serial.print("\t");
-  Serial.print(value);
-  Serial.print("\t");
-  Serial.print(baseline[ldrIndex]);
-  Serial.print("\t\t+");
-  Serial.println(delta);
+  // 3. Check for Button 10 (Rising Edge)
+  if (currentState10 == HIGH && lastState10 == LOW) {
+    number += 10;
+    changed = true;
+    delay(50); // Simple debouncing
+  }
+
+  // 4. Only print if something happened
+  if (changed) {
+    Serial.print("Number updated: ");
+    Serial.println(number);
+  }
+
+  // 5. Save states for next loop
+  lastState1 = currentState1;
+  lastState10 = currentState10;
 }
