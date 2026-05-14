@@ -17,21 +17,20 @@ const int GAME = 1;
 const int RESULTS = 2;
 
 // Pin Consts
-
-// Shift Register Pins
 const int EMPTY_PIN_2 = 2;
 const int EMPTY_PIN_3 = 3;
 const int EMPTY_PIN_4 = 4;
 const int EMPTY_PIN_5 = 5;
 const int EMPTY_PIN_6 = 6;
 const int EMPTY_PIN_7 = 7;
-const int latchPin = 8;
+const int latchPin = 8; // Shift Register
 const int EMPTY_PIN_9 = 9;
 const int EMPTY_PIN_10 = 10;
-const int dataPin = 11;
-const int clockPin = 12;
+const int dataPin = 11; // Shift Register
+const int clockPin = 12; // Shift Register
 const int EMPTY_PIN_13 = 13;
 
+// Shift Register Pins
 const int SHIFT_PIN_0 = 0;
 const int SHIFT_PIN_1 = 1;
 const int SHIFT_PIN_2 = 2;
