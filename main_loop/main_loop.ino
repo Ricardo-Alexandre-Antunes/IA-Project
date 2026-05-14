@@ -16,6 +16,15 @@ const int SETUP = 0;
 const int GAME = 1;
 const int RESULTS = 2;
 
+// Pin Consts
+
+// Shift Register Pins
+const int latchPin = 8;
+const int clockPin = 12;
+const int dataPin = 11;
+
+byte shift_pins = 0;
+
 // -------------- END CONSTANTS --------------
 
 // -------------- CLASSES --------------
@@ -118,11 +127,28 @@ void setup() {
 // Setup all pins (INPUT / OUTPUT)
 void setupPins() {
 
+  // Shift Register Pins
+  pinMode(latchPin, OUTPUT);
+  pinMode(clockPin, OUTPUT);
+  pinMode(dataPin, OUTPUT);
 }
 
 // -------------- END SETUP --------------
 
 // -------------- HELPER METHODS --------------
+
+// Shift Register
+
+void updateShiftRegister() {
+  digitalWrite(latchPin, LOW);
+  shiftOut(dataPin, clockPin, LSBFIRST, leds);
+  digitalWrite(latchPin, HIGH);
+}
+
+// By default the value is LOW, use this method to set value to HIGH
+void setShiftRegisterPinHIGH(int pin) {
+  bitSet(shift_pins, pin);
+}
 
 // SETUP
 
