@@ -38,9 +38,8 @@ const int SHIFT_PIN_3 = 3;
 const int SHIFT_PIN_4 = 4;
 const int SHIFT_PIN_5 = 5;
 const int SHIFT_PIN_6 = 6;
-const int SHIFT_PIN_6 = 7;
+const int SHIFT_PIN_7 = 7;
 const int SHIFT_PIN_15 = 15;
-
 
 byte shift_pins = 0;
 
@@ -160,7 +159,7 @@ void setupPins() {
 
 void updateShiftRegister() {
   digitalWrite(latchPin, LOW);
-  shiftOut(dataPin, clockPin, LSBFIRST, leds);
+  shiftOut(dataPin, clockPin, LSBFIRST, shift_pins);
   digitalWrite(latchPin, HIGH);
 }
 
