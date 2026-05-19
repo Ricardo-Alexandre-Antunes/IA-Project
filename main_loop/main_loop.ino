@@ -1,45 +1,52 @@
+// -------------- LIBRARIES --------------
+#include "FastLED.h"
+
 // -------------- CONSTANTS --------------
 
 // Operations Consts
-const int ADD = 0;
-const int SUBTRACT = 1;
-const int MULTIPLY = 2;
-const int DIVIDE = 3;
+#define ADD 0;
+#define SUBTRACT 1;
+#define MULTIPLY 2;
+#define DIVIDE 3;
 
 // Difficulty Consts
-const int EASY = 0;
-const int MEDIUM = 1;
-const int HARD = 2;
+#define EASY 0;
+#define MEDIUM 1;
+#define HARD 2;
 
 // Game State Consts
-const int SETUP = 0;
-const int GAME = 1;
-const int RESULTS = 2;
+#define SETUP 0;
+#define GAME 1;
+#define RESULTS 2;
 
 // Pin Consts
-const int PLUS_LED = 2;
-const int MINUS_LED = 3;
-const int MULT_LED = 4;
-const int DIVIDE_LED = 5;
-const int OPERATION_DISPLAY = 6;
-const int EMPTY_PIN_7 = 7;
-const int latchPin = 8; // Shift Register
-const int EMPTY_PIN_9 = 9;
-const int EMPTY_PIN_10 = 10;
-const int dataPin = 11; // Shift Register
-const int clockPin = 12; // Shift Register
-const int CENTRAL_BUTTON = 13;
+#define OPERATIONS_LED 2;
+#define LEDS_STRIP 3;
+#define EMPTY_PIN_4 4;
+#define EMPTY_PIN_5 5;
+#define OPERATION_DISPLAY 6;
+#define CENTRAL_BUTTON 7;
+#define EASY_BUTTON 8; // Shift Register
+#define MEDIUM_BUTTON 9;
+#define HARD_BUTTON 10;
+#define latchPin 11; // Shift Register
+#define dataPin 12; // Shift Register
+#define clockPin 13;
+
 
 // Shift Register Pins
-const int SHIFT_PIN_0 = 0;
-const int SHIFT_PIN_1 = 1;
-const int SHIFT_PIN_2 = 2;
-const int SHIFT_PIN_3 = 3;
-const int SHIFT_PIN_4 = 4;
-const int SHIFT_PIN_5 = 5;
-const int SHIFT_PIN_6 = 6;
-const int SHIFT_PIN_7 = 7;
-const int SHIFT_PIN_15 = 15;
+#define SHIFT_PIN_0 0;
+#define SHIFT_PIN_1 1;
+#define SHIFT_PIN_2 2;
+#define SHIFT_PIN_3 3;
+#define SHIFT_PIN_4 4;
+#define SHIFT_PIN_5 5;
+#define SHIFT_PIN_6 6;
+#define SHIFT_PIN_7 7;
+#define SHIFT_PIN_15 15;
+
+// Enderecable LEDS
+#define NUM_LEDS 8
 
 byte shift_pins = 0;
 
@@ -128,7 +135,6 @@ void nextGameState() {
 
 // Main Setup (Do not remove!!!)
 void setup() {
-  firstLoop = true;
   int easyOps[4] = {1, 0, 0, 0}; // Only addition allowed
   int mediumOps[4] = {1, 1, 0, 0}; // Addition and Subtraction allowed
   int hardOps[4] = {1, 1, 1, 1}; // Addition, Subtraction, Multiplication and Division allowed
@@ -200,20 +206,23 @@ void updateScores() {
 // Loop relevant for things happening during the setup of the game
 void setupLoop() {
   // Display current operations in operation leds
-  Difficulty difficulty = getCurrentDifficulty(currentDifficulty);
-  for (int i = 0; i < 3; i++) {
-    if (difficulty.isOperationAllowed(i)) {
-      digitalWrite(i + 2, HIGH);
-    }
-    else {
-      digitalWrite(i + 2, LOW);
-    }
-  }
+  Difficulty difficulty = getDifficulty(currentDifficulty);
 
   // Display current dfficulty index in operation
   displayNumber(OPERATION_DISPLAY, currentDifficulty);
 
-  // Read joystick input from either player and change difficulty accordingly
+  // Read difficulty buttons to change difficulty
+  if (digitalRead(EASY_BUTTON)) {
+    currentDifficulty = EASY;
+  }
+
+  if (digitalRead(MEDIUM_BUTTON)) {
+    currentDifficulty = MEDIUM;
+  }
+
+  if (digitalRead(HARD_BUTTON)) {
+    currentDifficulty = HARD;
+  }
 
 
   // Read central button value, if 1 go over to game mode
