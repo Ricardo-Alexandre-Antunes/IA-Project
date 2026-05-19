@@ -17,18 +17,18 @@ const int GAME = 1;
 const int RESULTS = 2;
 
 // Pin Consts
-const int EMPTY_PIN_2 = 2;
-const int EMPTY_PIN_3 = 3;
-const int EMPTY_PIN_4 = 4;
-const int EMPTY_PIN_5 = 5;
-const int EMPTY_PIN_6 = 6;
+const int PLUS_LED = 2;
+const int MINUS_LED = 3;
+const int MULT_LED = 4;
+const int DIVIDE_LED = 5;
+const int OPERATION_DISPLAY = 6;
 const int EMPTY_PIN_7 = 7;
 const int latchPin = 8; // Shift Register
 const int EMPTY_PIN_9 = 9;
 const int EMPTY_PIN_10 = 10;
 const int dataPin = 11; // Shift Register
 const int clockPin = 12; // Shift Register
-const int EMPTY_PIN_13 = 13;
+const int CENTRAL_BUTTON = 13;
 
 // Shift Register Pins
 const int SHIFT_PIN_0 = 0;
@@ -128,7 +128,7 @@ void nextGameState() {
 
 // Main Setup (Do not remove!!!)
 void setup() {
-
+  firstLoop = true;
   int easyOps[4] = {1, 0, 0, 0}; // Only addition allowed
   int mediumOps[4] = {1, 1, 0, 0}; // Addition and Subtraction allowed
   int hardOps[4] = {1, 1, 1, 1}; // Addition, Subtraction, Multiplication and Division allowed
@@ -136,6 +136,7 @@ void setup() {
   difficultyList[0] = Difficulty(easyOps);
   difficultyList[1] = Difficulty(mediumOps);
   difficultyList[2] = Difficulty(hardOps);
+  setDifficulty(EASY);
 
   setupPins();
 
@@ -174,7 +175,8 @@ void setShiftRegisterPinHIGH(int pin) {
 // GAMEPLAY
 
 // Method that displays a number in a certain display
-void displayNumber(int displayID) {
+void displayNumber(int displayID, int number) {
+  if (number > 9999 || number < 0) return -1; // cannot show number outside of range
 
 }
 
@@ -197,6 +199,27 @@ void updateScores() {
 
 // Loop relevant for things happening during the setup of the game
 void setupLoop() {
+  // Display current operations in operation leds
+  Difficulty difficulty = getCurrentDifficulty(currentDifficulty);
+  for (int i = 0; i < 3; i++) {
+    if (difficulty.isOperationAllowed(i)) {
+      digitalWrite(i + 2, HIGH);
+    }
+    else {
+      digitalWrite(i + 2, LOW);
+    }
+  }
+
+  // Display current dfficulty index in operation
+  displayNumber(OPERATION_DISPLAY, currentDifficulty);
+
+  // Read joystick input from either player and change difficulty accordingly
+
+
+  // Read central button value, if 1 go over to game mode
+  if (digitalRead(CENTRAL_BUTTON) == HIGH) {
+    currentGameState = GAME;
+  }
 
 }
 
@@ -207,6 +230,12 @@ void gameLoop() {
 
 // Loop relevant for things happening after the game is done
 void resultsLoop() {
+
+  // Flicker scoring LED's to showcase winning
+
+  // Store current score between the 2 players (could this be stored forever?)
+
+  // 
 
 }
 
