@@ -3,10 +3,7 @@
 #include <TM1637.h>
 
 // -------------- CONSTANTS --------------
-TM1637 dispNum1(6, 7); // Number 1 of equation
-TM1637 dispNum2(6, 8); // Number 2 of equation
-TM1637 dispA(6, 9);    // Player A entry
-TM1637 dispB(6, 10);   // Player B entry
+
 
 
 // Operations Consts
@@ -26,24 +23,24 @@ TM1637 dispB(6, 10);   // Player B entry
 #define RESULTS 2;
 
 // Pin Consts
-#define OPERATIONS_LED 2;
-#define LEDS_STRIP 3;
-#define EMPTY_PIN_4 4;
-#define EMPTY_PIN_5 5;
-#define OPERATION_DISPLAY 6;
+#define OPERATION_DISPLAY_1 2;
+#define LEDS_STRIP 3; // Analog
+#define PLAYER_A_DISPLAY 4;
+#define OPERATIONS_LED_R 5; // Analog
+#define OPERATION_DISPLAY_2 6; // Analog
 #define CENTRAL_BUTTON 7;
-#define EASY_BUTTON 8; // Shift Register
-#define MEDIUM_BUTTON 9;
-#define HARD_BUTTON 10;
-#define latchPin 11; // Shift Register
+#define PLAYER_B_DISPLAY 8;
+#define OPERATIONS_LED_G 9; // Analog
+#define OPERATIONS_LED_B 10; // Analog
+#define latchPin 11; // Shift Register / Analog
 #define dataPin 12; // Shift Register
-#define clockPin 13;
+#define clockPin 13; // Shift Register
 
 
 // Shift Register Pins
-#define SHIFT_PIN_0 0;
-#define SHIFT_PIN_1 1;
-#define SHIFT_PIN_2 2;
+#define EASY_BUTTON 0;
+#define MEDIUM_BUTTON 1;
+#define HARD_BUTTON 2;
 #define SHIFT_PIN_3 3;
 #define SHIFT_PIN_4 4;
 #define SHIFT_PIN_5 5;
@@ -57,6 +54,11 @@ TM1637 dispB(6, 10);   // Player B entry
 #define PB_X = A2;
 #define PB_Y = A3;
 
+TM1637 dispNum1(6, OPERATION_DISPLAY_1); // Number 1 of equation
+TM1637 dispNum2(6, OPERATION_DISPLAY_2); // Number 2 of equation
+TM1637 dispA(6, PLAYER_A_DISPLAY);    // Player A entry
+TM1637 dispB(6, PLAYER_B_DISPLAY);   // Player B entry
+
 // Enderecable LEDS
 #define NUM_LEDS 8
 CRGB leds[NUM_LEDS];
@@ -65,60 +67,7 @@ byte shift_pins = 0;
 
 // -------------- END CONSTANTS --------------
 
-// -------------- CLASSES --------------
-
-class Difficulty {
-  private:
-    int operationsAllowed[4]; // 0 if operation is not allowed, 1 if operation is allowed
-
-  public:
-
-    // Default constructor
-    Difficulty() {
-      for (int i = 0; i < 4; i++) {
-        operationsAllowed[i] = 0;
-      }
-    }
-
-    // Main constructor
-    Difficulty(int operations[4]) {
-      for (int i = 0; i < 4; i++) {
-        operationsAllowed[i] = operations[i];
-      }
-    }
-
-    String allowedOperations() {
-
-      String result = "";
-
-      result += "ADD: ";
-      result += String(operationsAllowed[ADD]);
-
-      result += " | SUBTRACT: ";
-      result += String(operationsAllowed[SUBTRACT]);
-
-      result += " | MULTIPLY: ";
-      result += String(operationsAllowed[MULTIPLY]);
-
-      result += " | DIVIDE: ";
-      result += String(operationsAllowed[DIVIDE]);
-
-      return result;
-    }
-
-    bool isOperationAllowed(int operation) {
-      if (operation < 0 || operation > 3) {
-        return 0;
-      }
-      return operationsAllowed[operation];
-    }
-};
-
-// -------------- END CLASSES --------------
-
 // -------------- VARIABLES --------------
-
-Difficulty difficultyList[3];
 
 // Current States
 int currentGameState = SETUP;
@@ -144,8 +93,8 @@ void setDifficulty(int difficulty) {
   currentDifficulty = difficulty;
 }
 
-Difficulty getDifficulty(int difficulty) {
-  return difficultyList[difficulty];
+int getDifficulty(int difficulty) {
+  return currentDifficulty;
 }
 
 void nextGameState() {
@@ -159,13 +108,6 @@ void nextGameState() {
 
 // Main Setup (Do not remove!!!)
 void setup() {
-  int easyOps[4] = {1, 0, 0, 0}; // Only addition allowed
-  int mediumOps[4] = {1, 1, 0, 0}; // Addition and Subtraction allowed
-  int hardOps[4] = {1, 1, 1, 1}; // Addition, Subtraction, Multiplication and Division allowed
-
-  difficultyList[0] = Difficulty(easyOps);
-  difficultyList[1] = Difficulty(mediumOps);
-  difficultyList[2] = Difficulty(hardOps);
   setDifficulty(EASY);
 
   setupPins();
@@ -269,6 +211,14 @@ bool handleJoystick(int xPin, int yPin, int &cursor, int digits[])
     return changed;
 }
 
+void refreshDisplay(TM1637 &display, int digits[])
+{
+    for (int i = 0; i < 4; i++)
+    {
+        display.display(i, digits[i]);
+    }
+}
+
 
 // Method that displays a number in a certain display
 void displayNumber(TM1637 &display, int number) {
@@ -287,17 +237,78 @@ void displayNumber(TM1637 &display, int number) {
 
 // Method that generates a new operation and displays it
 void newOperation() {
-  int n1 = random(1, 50);
-  int n2 = random(1, 50);
-  targetAnswer = n1 + n2;
-
-  Serial.print("\nNEW PROBLEM: ");
-  Serial.print(n1);
-  Serial.print(" + ");
-  Serial.print(n2);
-  Serial.print(" = ");
-  Serial.println(targetAnswer);
-
+  int operation = random(4);
+  int first_number;
+  int second_number;
+  switch (currentDifficulty){
+    case EASY:
+      switch (operation){
+        case ADD:
+          first_number = random(100);
+          second_number = random(100);
+          targetAnswer = first_number + second_number;
+        case SUBTRACT:
+          first_number = random(100);
+          second_number = random(first_number + 1);
+          targetAnswer = first_number - second_number;
+        case MULTIPLY:
+          first_number = random(9) + 2;
+          second_number = random(9) + 2;
+          targetAnswer = first_number * second_number;
+        case DIVIDE:
+          do {
+            first_number = random(100);
+            second_number = random(9) + 1;
+          } while (first_number % second_number != 0);
+          targetAnswer = first_number / second_number;
+      }
+    case MEDIUM:
+      switch (operation){
+        case ADD:
+          first_number = random(1000);
+          second_number = random(1000);
+          targetAnswer = first_number + second_number;
+        case SUBTRACT:
+          first_number = random(1000);
+          second_number = random(first_number + 1);
+          targetAnswer = first_number - second_number;
+        case MULTIPLY:
+          do {
+            first_number = random(998) + 2;
+            second_number = random(998) + 2;
+          } while (first_number * second_number > 999);
+          targetAnswer = first_number * second_number;
+        case DIVIDE:
+          do {
+            first_number = random(1000);
+            second_number = random(99) + 1;
+          } while (first_number % second_number != 0);
+          targetAnswer = first_number / second_number;
+      }
+    case HARD:
+      switch (operation){
+        case ADD:
+          first_number = random(10000);
+          second_number = random(9999 - first_number);
+          targetAnswer = first_number + second_number;
+        case SUBTRACT:
+          first_number = random(10000);
+          second_number = random(first_number + 1);
+          targetAnswer = first_number - second_number;
+        case MULTIPLY:
+          do {
+            first_number = random(9998) + 2;
+            second_number = random(9998) + 2;
+          } while (first_number * second_number > 9999);
+          targetAnswer = first_number * second_number;
+        case DIVIDE:
+          do {
+            first_number = random(10000);
+            second_number = random(9999) + 1;
+          } while (first_number % second_number != 0);
+          targetAnswer = first_number / second_number;
+      }
+  }
   // Reset Player Arrays
   for (int i = 0; i < 4; i++)
   {
@@ -305,11 +316,12 @@ void newOperation() {
       playerB_digits[i] = 0;
   }
 
+
   // Show problem on top displays
-  dispNum1.display(2, (n1 / 10) % 10);
-  dispNum1.display(3, n1 % 10);
-  dispNum2.display(2, (n2 / 10) % 10);
-  dispNum2.display(3, n2 % 10);
+  dispNum1.display(2, (first_number / 10) % 10);
+  dispNum1.display(3, first_number % 10);
+  dispNum2.display(2, (second_number / 10) % 10);
+  dispNum2.display(3, second_number % 10);
 
   // Clear Player displays to zero
   refreshDisplay(dispA, playerA_digits);
@@ -358,7 +370,6 @@ void updateScores() {
     currentGameState = RESULTS
   }
 }
-
 
 // -------------- END HELPER METHODS --------------
 
@@ -415,13 +426,12 @@ void gameLoop() {
 }
 
 // Loop relevant for things happening after the game is done
+// TODO
 void resultsLoop() {
 
   // Flicker scoring LED's to showcase winning
 
   // Store current score between the 2 players (could this be stored forever?)
-
-  // 
 
 }
 
