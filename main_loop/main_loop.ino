@@ -188,7 +188,66 @@ void displayNumber(int displayID, int number) {
 
 // Method that generates a new operation and displays it
 void newOperation() {
-
+  int operation = random(4);
+  int first_number;
+  int second_number;
+  switch (currentDifficulty){
+    case EASY:
+      switch (operation){
+        case ADD:
+          first_number = random(100);
+          second_number = random(100);
+        case SUBTRACT:
+          first_number = random(100);
+          second_number = random(first_number + 1);
+        case MULTIPLY:
+          first_number = random(9) + 2;
+          second_number = random(9) + 2;
+        case DIVIDE:
+          do {
+            first_number = random(100);
+            second_number = random(9) + 1;
+          } while (first_number % second_number != 0);
+      }
+    case MEDIUM:
+      switch (operation){
+        case ADD:
+          first_number = random(1000);
+          second_number = random(1000);
+        case SUBTRACT:
+          first_number = random(1000);
+          second_number = random(first_number + 1);
+        case MULTIPLY:
+          do {
+            first_number = random(998) + 2;
+            second_number = random(998) + 2;
+          } while (first_number * second_number > 999);
+        case DIVIDE:
+          do {
+            first_number = random(1000);
+            second_number = random(99) + 1;
+          } while (first_number % second_number != 0);
+      }
+    case HARD:
+      switch (operation){
+        case ADD:
+          first_number = random(10000);
+          second_number = random(9999 - first_number);
+        case SUBTRACT:
+          first_number = random(10000);
+          second_number = random(first_number + 1);
+        case MULTIPLY:
+          do {
+            first_number = random(9998) + 2;
+            second_number = random(9998) + 2;
+          } while (first_number * second_number > 9999);
+        case DIVIDE:
+          do {
+            first_number = random(10000);
+            second_number = random(9999) + 1;
+          } while (first_number % second_number != 0);
+      }
+  }
 }
 
 // Method that calculates scores based on the current operation and the values on each player's display
