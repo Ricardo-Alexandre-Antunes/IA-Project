@@ -1,6 +1,6 @@
 // -------------- LIBRARIES --------------
 #include "FastLED.h"
-#include <TM1637.h>
+#include <TM1637TinyDisplay.h>
 
 // -------------- CONSTANTS --------------
 
@@ -54,10 +54,10 @@
 #define PB_X A2
 #define PB_Y A3
 
-TM1637 dispNum1(6, OPERATION_DISPLAY_1); // Number 1 of equation
-TM1637 dispNum2(6, OPERATION_DISPLAY_2); // Number 2 of equation
-TM1637 dispA(6, PLAYER_A_DISPLAY);    // Player A entry
-TM1637 dispB(6, PLAYER_B_DISPLAY);   // Player B entry
+TM1637TinyDisplay dispNum1(6, OPERATION_DISPLAY_1, 0, false); // Number 1 of equation
+TM1637TinyDisplay dispNum2(6, OPERATION_DISPLAY_2, 0, true); // Number 2 of equation
+TM1637TinyDisplay dispA(6, PLAYER_A_DISPLAY, 0, false);    // Player A entry
+TM1637TinyDisplay dispB(6, PLAYER_B_DISPLAY, true);   // Player B entry
 
 // Enderecable LEDS
 #define NUM_LEDS 8
@@ -125,16 +125,16 @@ void setupPins() {
   pinMode(CENTRAL_BUTTON, INPUT_PULLUP);
 
   // Init displays
-  dispNum1.init();
-  dispNum2.init();
-  dispA.init();
-  dispB.init();
+  dispNum1.begin(true);
+  dispNum2.begin(true);
+  dispA.begin(true);
+  dispB.begin(true);
 
   // Init brightness
-  dispNum1.set(2);
-  dispNum2.set(2);
-  dispA.set(5);
-  dispB.set(5);
+  dispNum1.setBrightness(2);
+  dispNum2.setBrightness(2);
+  dispA.setBrightness(2);
+  dispB.setBrightness(2);
 
   randomSeed(analogRead(A5));
 
@@ -211,17 +211,18 @@ bool handleJoystick(int xPin, int yPin, int &cursor, int digits[])
     return changed;
 }
 
-void refreshDisplay(TM1637 &display, int digits[])
+void refreshDisplay(TM1637TinyDisplay &display, int digits[])
 {
     for (int i = 0; i < 4; i++)
     {
-        display.display(i, digits[i]);
+      int number = digits[0] * 1000 + digits[1] + 100 + digits[2] * 10 + digits[3];
+      display.showNumber(number);
     }
 }
 
 
 // Method that displays a number in a certain display
-void displayNumber(TM1637 &display, int number) {
+void displayNumber(TM1637TinyDisplay &display, int number) {
   if (number > 9999 || number < 0) return -1; // cannot show number outside of range
   int digits[4] = {0, 0, 0, 0};
   digits[3] = number % 10;
@@ -229,10 +230,7 @@ void displayNumber(TM1637 &display, int number) {
   digits[1] = (number / 100) % 10;
   digits[0] = (number / 1000) % 10;
 
-  for (int i = 0; i < 4; i++)
-  {
-      display.display(i, digits[i]);
-  }
+  refreshDisplay(display, digits);
 }
 
 // Method that generates a new operation and displays it
@@ -318,10 +316,8 @@ void newOperation() {
 
 
   // Show problem on top displays
-  dispNum1.display(2, (first_number / 10) % 10);
-  dispNum1.display(3, first_number % 10);
-  dispNum2.display(2, (second_number / 10) % 10);
-  dispNum2.display(3, second_number % 10);
+  dispNum1.showNumber(first_number);
+  dispNum2.showNumber(second_number);
 
   // Clear Player displays to zero
   refreshDisplay(dispA, playerA_digits);
@@ -342,8 +338,6 @@ void updateScores() {
       if (playerAScore >= playerBScore) {
         playerBScore++; // push other player backwards
       }
-      for (int i = 0; i < 4; i++)
-          dispA.display(i, 8); // Success flash
   }
 
   if (valB == targetAnswer)
@@ -353,8 +347,6 @@ void updateScores() {
       if (playerBScore <= playerAScore) {
         playerAScore--; // push other player backwards
       }
-      for (int i = 0; i < 4; i++)
-          dispB.display(i, 8); // Success flash
   }
 
   for (int i = 0; i < 8; i++) {
