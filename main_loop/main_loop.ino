@@ -7,52 +7,52 @@
 
 
 // Operations Consts
-#define ADD 0;
-#define SUBTRACT 1;
-#define MULTIPLY 2;
-#define DIVIDE 3;
+#define ADD 0
+#define SUBTRACT 1
+#define MULTIPLY 2
+#define DIVIDE 3
 
 // Difficulty Consts
-#define EASY 0;
-#define MEDIUM 1;
-#define HARD 2;
+#define EASY 0
+#define MEDIUM 1
+#define HARD 2
 
 // Game State Consts
-#define SETUP 0;
-#define GAME 1;
-#define RESULTS 2;
+#define SETUP 0
+#define GAME 1
+#define RESULTS 2
 
 // Pin Consts
-#define OPERATION_DISPLAY_1 2;
-#define LEDS_STRIP 3; // Analog
-#define PLAYER_A_DISPLAY 4;
-#define OPERATIONS_LED_R 5; // Analog
-#define OPERATION_DISPLAY_2 6; // Analog
-#define CENTRAL_BUTTON 7;
-#define PLAYER_B_DISPLAY 8;
-#define OPERATIONS_LED_G 9; // Analog
-#define OPERATIONS_LED_B 10; // Analog
-#define latchPin 11; // Shift Register / Analog
-#define dataPin 12; // Shift Register
-#define clockPin 13; // Shift Register
+#define OPERATION_DISPLAY_1 2
+#define LEDS_STRIP 3 // Analog
+#define PLAYER_A_DISPLAY 4
+#define OPERATIONS_LED_R 5 // Analog
+#define OPERATION_DISPLAY_2 6 // Analog
+#define CENTRAL_BUTTON 7
+#define PLAYER_B_DISPLAY 8
+#define OPERATIONS_LED_G 9 // Analog
+#define OPERATIONS_LED_B 10 // Analog
+#define latchPin 11 // Shift Register / Analog
+#define dataPin 12 // Shift Register
+#define clockPin 13 // Shift Register
 
 
 // Shift Register Pins
-#define EASY_BUTTON 0;
-#define MEDIUM_BUTTON 1;
-#define HARD_BUTTON 2;
-#define SHIFT_PIN_3 3;
-#define SHIFT_PIN_4 4;
-#define SHIFT_PIN_5 5;
-#define SHIFT_PIN_6 6;
-#define SHIFT_PIN_7 7;
-#define SHIFT_PIN_15 15;
+#define EASY_BUTTON 0
+#define MEDIUM_BUTTON 1
+#define HARD_BUTTON 2
+#define SHIFT_PIN_3 3
+#define SHIFT_PIN_4 4
+#define SHIFT_PIN_5 5
+#define SHIFT_PIN_6 6
+#define SHIFT_PIN_7 7
+#define SHIFT_PIN_15 15
 
 // Analog Pins
-#define PA_X = A0;
-#define PA_Y = A1;
-#define PB_X = A2;
-#define PB_Y = A3;
+#define PA_X A0
+#define PA_Y A1
+#define PB_X A2
+#define PB_Y A3
 
 TM1637 dispNum1(6, OPERATION_DISPLAY_1); // Number 1 of equation
 TM1637 dispNum2(6, OPERATION_DISPLAY_2); // Number 2 of equation
@@ -81,8 +81,8 @@ int cursorB = 3;
 
 int playerAScore = 3;
 int playerBScore = NUM_LEDS - 4;
-const int playerAColor[3] = [255, 0, 0]; // GREEN
-const int playerBColor[3] = [0, 255, 0]; // RED
+const int playerAColor[3] = {255, 0, 0}; // GREEN
+const int playerBColor[3] = {0, 255, 0}; // RED
 
 // -------------- END VARIABLES --------------
 
@@ -223,11 +223,11 @@ void refreshDisplay(TM1637 &display, int digits[])
 // Method that displays a number in a certain display
 void displayNumber(TM1637 &display, int number) {
   if (number > 9999 || number < 0) return -1; // cannot show number outside of range
-  int digits[4] = [0, 0, 0, 0];
+  int digits[4] = {0, 0, 0, 0};
   digits[3] = number % 10;
-  digits[2] = (number / 10) % 10
-  digits[1] = (number / 100) % 10
-  digits[0] = (number / 1000) % 10
+  digits[2] = (number / 10) % 10;
+  digits[1] = (number / 100) % 10;
+  digits[0] = (number / 1000) % 10;
 
   for (int i = 0; i < 4; i++)
   {
@@ -338,7 +338,7 @@ void updateScores() {
   if (valA == targetAnswer)
   {
       Serial.println("PLAYER A WINS!");
-      playerAScore++:
+      playerAScore++;
       if (playerAScore >= playerBScore) {
         playerBScore++; // push other player backwards
       }
@@ -367,7 +367,7 @@ void updateScores() {
   }
 
   if (playerAScore == NUM_LEDS || playerBScore == 0) {
-    currentGameState = RESULTS
+    currentGameState = RESULTS;
   }
 }
 
@@ -378,10 +378,10 @@ void updateScores() {
 // Loop relevant for things happening during the setup of the game
 void setupLoop() {
   // Display current operations in operation leds
-  Difficulty difficulty = getDifficulty(currentDifficulty);
+  int difficulty = getDifficulty(currentDifficulty);
 
   // Display current dfficulty index in operation
-  displayNumber(OPERATION_DISPLAY, currentDifficulty);
+  displayNumber(dispNum1, currentDifficulty);
 
   // Read difficulty buttons to change difficulty
   if (digitalRead(EASY_BUTTON)) {
@@ -407,27 +407,35 @@ void setupLoop() {
 // Loop relevant for things happening during the game itself
 void gameLoop() {
     // Handle Player A Navigation & Input
-    bool updateA = handleJoystick(pA_X, pA_Y, cursorA, playerA_digits);
+    bool updateA = handleJoystick(PA_X, PA_Y, cursorA, playerA_digits);
     if (updateA)
         refreshDisplay(dispA, playerA_digits);
 
     // Handle Player B Navigation & Input
-    bool updateB = handleJoystick(pB_X, pB_Y, cursorB, playerB_digits);
+    bool updateB = handleJoystick(PB_X, PB_Y, cursorB, playerB_digits);
     if (updateB)
         refreshDisplay(dispB, playerB_digits);
 
     // Check Answer Button (Active LOW)
-    if (digitalRead(buttonPin) == LOW)
+    if (digitalRead(CENTRAL_BUTTON) == LOW)
     {
-        checkWinCondition();
+        updateScores();
         delay(2000); // Winner display time
-        generateNewProblem();
+        newOperation();
     }
 }
 
 // Loop relevant for things happening after the game is done
 // TODO
 void resultsLoop() {
+
+  bool playerAWon = playerAScore == NUM_LEDS;
+  int ledColors[3] = {playerBColor[0], playerBColor[1], playerBColor[2]};
+  if (playerAWon) {
+    ledColors[0] = playerAColor[0];
+    ledColors[1] = playerAColor[1];
+    ledColors[2] = playerAColor[2];
+  }
 
   // Flicker scoring LED's to showcase winning
 
