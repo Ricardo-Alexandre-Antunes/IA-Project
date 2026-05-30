@@ -1,455 +1,615 @@
 // -------------- LIBRARIES --------------
-#include "FastLED.h"
+#include <FastLED.h>
 #include <TM1637TinyDisplay.h>
 
-// -------------- CONSTANTS --------------
-
-
-
-// Operations Consts
+// -------------- OPERATION CONSTANTS --------------
 #define ADD 0
 #define SUBTRACT 1
 #define MULTIPLY 2
-#define DIVIDE 3
 
-// Difficulty Consts
-#define EASY 0
-#define MEDIUM 1
-#define HARD 2
+// -------------- GAME STATE CONSTANTS --------------
+#define GAME 0
+#define RESULTS 1
 
-// Game State Consts
-#define SETUP 0
-#define GAME 1
-#define RESULTS 2
-
-// Pin Consts
+// -------------- PIN CONSTANTS --------------
 #define OPERATION_DISPLAY_1 2
-#define LEDS_STRIP 3 // Analog
 #define PLAYER_A_DISPLAY 4
-#define OPERATIONS_LED_R 5 // Analog
-#define OPERATION_DISPLAY_2 6 // Analog
-#define CENTRAL_BUTTON 7
+#define OPERATIONS_LED_R 5
+#define OPERATION_DISPLAY_2 6
+#define DISPLAY_CLKS 7
 #define PLAYER_B_DISPLAY 8
-#define OPERATIONS_LED_G 9 // Analog
-#define OPERATIONS_LED_B 10 // Analog
-#define latchPin 11 // Shift Register / Analog
-#define dataPin 12 // Shift Register
-#define clockPin 13 // Shift Register
+#define OPERATIONS_LED_G 9
+#define OPERATIONS_LED_B 10
+#define LED_STRIP 11
+#define CENTRAL_BUTTON 13
 
-
-// Shift Register Pins
-#define EASY_BUTTON 0
-#define MEDIUM_BUTTON 1
-#define HARD_BUTTON 2
-#define SHIFT_PIN_3 3
-#define SHIFT_PIN_4 4
-#define SHIFT_PIN_5 5
-#define SHIFT_PIN_6 6
-#define SHIFT_PIN_7 7
-#define SHIFT_PIN_15 15
-
-// Analog Pins
+// -------------- ANALOG PINS --------------
 #define PA_X A0
 #define PA_Y A1
 #define PB_X A2
 #define PB_Y A3
 
-TM1637TinyDisplay dispNum1(6, OPERATION_DISPLAY_1, 0, false); // Number 1 of equation
-TM1637TinyDisplay dispNum2(6, OPERATION_DISPLAY_2, 0, true); // Number 2 of equation
-TM1637TinyDisplay dispA(6, PLAYER_A_DISPLAY, 0, false);    // Player A entry
-TM1637TinyDisplay dispB(6, PLAYER_B_DISPLAY, true);   // Player B entry
-
-// Enderecable LEDS
+// -------------- LED STRIP --------------
 #define NUM_LEDS 8
+#define POINTS_TO_WIN 4
+
 CRGB leds[NUM_LEDS];
 
-byte shift_pins = 0;
+// -------------- DISPLAYS --------------
+// If a display is upside down, change the final true/false value.
+TM1637TinyDisplay dispNum1(DISPLAY_CLKS, OPERATION_DISPLAY_1, 0, false);
+TM1637TinyDisplay dispNum2(DISPLAY_CLKS, OPERATION_DISPLAY_2, 0, true);
+TM1637TinyDisplay dispA(DISPLAY_CLKS, PLAYER_A_DISPLAY, 0, false);
+TM1637TinyDisplay dispB(DISPLAY_CLKS, PLAYER_B_DISPLAY, 0, true);
 
-// -------------- END CONSTANTS --------------
+// -------------- GAME VARIABLES --------------
+int currentGameState = GAME;
 
-// -------------- VARIABLES --------------
-
-// Current States
-int currentGameState = SETUP;
-int currentDifficulty = EASY;
-
+int currentOperation = ADD;
+int firstNumber = 0;
+int secondNumber = 0;
 int targetAnswer = 0;
-int playerA_digits[4] = {0, 0, 0, 0};
-int playerB_digits[4] = {0, 0, 0, 0};
-int cursorA = 3; // 0=Thousand, 1=Hundred, 2=Ten, 3=Unit
-int cursorB = 3;
 
-int playerAScore = 3;
-int playerBScore = NUM_LEDS - 4;
-const int playerAColor[3] = {255, 0, 0}; // GREEN
-const int playerBColor[3] = {0, 255, 0}; // RED
+int playerAValue = 0;
+int playerBValue = 0;
 
-// -------------- END VARIABLES --------------
+// Selected place:
+// 0 = units
+// 1 = tens
+// 2 = hundreds
+// 3 = thousands
+int playerAPlace = 0;
+int playerBPlace = 0;
 
-// -------------- GETTERS / SETTERS --------------
+int playerAScore = 0;
+int playerBScore = 0;
 
-// Getters / Setters for states
-void setDifficulty(int difficulty) {
-  currentDifficulty = difficulty;
-}
+// Player A = red, left side
+CRGB playerAColor = CRGB::Red;
 
-int getDifficulty(int difficulty) {
-  return currentDifficulty;
-}
+// Player B = blue, right side
+CRGB playerBColor = CRGB::Blue;
 
-void nextGameState() {
-  currentGameState++;
-  currentGameState = currentGameState % 3;
-}
+// -------------- JOYSTICK SETTINGS --------------
+const int JOY_LOW = 200;
+const int JOY_HIGH = 800;
+const int JOY_CENTER_LOW = 400;
+const int JOY_CENTER_HIGH = 600;
 
-// -------------- END GETTERS / SETTERS --------------
+struct JoystickState
+{
+  bool xLocked;
+  bool yLocked;
+};
+
+JoystickState joystickA = {false, false};
+JoystickState joystickB = {false, false};
+
+// -------------- BUTTON DEBOUNCE --------------
+bool lastButtonReading = HIGH;
+bool stableButtonState = HIGH;
+unsigned long lastButtonChangeTime = 0;
+const unsigned long buttonDebounceDelay = 50;
 
 // -------------- SETUP --------------
-
-// Main Setup (Do not remove!!!)
-void setup() {
-  setDifficulty(EASY);
-
-  setupPins();
-
+void setup()
+{
   Serial.begin(9600);
-}
 
-// Setup all pins (INPUT / OUTPUT)
-void setupPins() {
-
-  // Shift Register Pins
-  pinMode(latchPin, OUTPUT);
-  pinMode(clockPin, OUTPUT);
-  pinMode(dataPin, OUTPUT);
   pinMode(CENTRAL_BUTTON, INPUT_PULLUP);
 
-  // Init displays
+  pinMode(OPERATIONS_LED_R, OUTPUT);
+  pinMode(OPERATIONS_LED_G, OUTPUT);
+  pinMode(OPERATIONS_LED_B, OUTPUT);
+
   dispNum1.begin(true);
   dispNum2.begin(true);
   dispA.begin(true);
   dispB.begin(true);
 
-  // Init brightness
+  dispNum2.flipDisplay(true);
+  dispB.flipDisplay(true);
+
   dispNum1.setBrightness(2);
   dispNum2.setBrightness(2);
   dispA.setBrightness(2);
   dispB.setBrightness(2);
 
+  FastLED.addLeds<WS2812, LED_STRIP, GRB>(leds, NUM_LEDS);
+  FastLED.clear();
+  FastLED.show();
+
   randomSeed(analogRead(A5));
 
-  // LED Strip
-  FastLED.addLeds<WS2812, LEDS_STRIP, RGB>(leds, NUM_LEDS);
-
+  newOperation();
 }
 
-// -------------- END SETUP --------------
-
-// -------------- HELPER METHODS --------------
-
-// Shift Register
-
-void updateShiftRegister() {
-  digitalWrite(latchPin, LOW);
-  shiftOut(dataPin, clockPin, LSBFIRST, shift_pins);
-  digitalWrite(latchPin, HIGH);
-}
-
-// By default the value is LOW, use this method to set value to HIGH
-void setShiftRegisterPinHIGH(int pin) {
-  bitSet(shift_pins, pin);
-}
-
-// SETUP
-
-
-// GAMEPLAY
-
-// Logic for Joystick movement: returns true if a change happened
-bool handleJoystick(int xPin, int yPin, int &cursor, int digits[])
+// -------------- DISPLAY HELPERS --------------
+void showNumber4(TM1637TinyDisplay &display, int number)
 {
-    int xVal = analogRead(xPin);
-    int yVal = analogRead(yPin);
-    bool changed = false;
+  if (number < 0)
+    number = 0;
 
-    // X-Axis: Switch digit position (Left/Right)
-    if (xVal > 900)
-    {
-        cursor++;
-        if (cursor > 3)
-            cursor = 0;
-        delay(250);
-        changed = true;
-    }
-    else if (xVal < 100)
-    {
-        cursor--;
-        if (cursor < 0)
-            cursor = 3;
-        delay(250);
-        changed = true;
-    }
+  if (number > 9999)
+    number = 9999;
 
-    // Y-Axis: Change digit value (Up/Down)
-    if (yVal < 100)
-    {
-        digits[cursor]++;
-        if (digits[cursor] > 9)
-            digits[cursor] = 0;
-        delay(250);
-        changed = true;
-    }
-    else if (yVal > 900)
-    {
-        digits[cursor]--;
-        if (digits[cursor] < 0)
-            digits[cursor] = 9;
-        delay(250);
-        changed = true;
-    }
-
-    return changed;
+  // true = show leading zeroes
+  // Example: 1 appears as 0001
+  display.showNumber(number, true);
 }
 
-void refreshDisplay(TM1637TinyDisplay &display, int digits[])
+// -------------- RGB OPERATION LED --------------
+void setOperationColor(int operation)
 {
-    for (int i = 0; i < 4; i++)
+  if (operation == ADD)
+  {
+    // Blue = +
+    analogWrite(OPERATIONS_LED_R, 0);
+    analogWrite(OPERATIONS_LED_G, 0);
+    analogWrite(OPERATIONS_LED_B, 255);
+  }
+  else if (operation == SUBTRACT)
+  {
+    // Red = -
+    analogWrite(OPERATIONS_LED_R, 255);
+    analogWrite(OPERATIONS_LED_G, 0);
+    analogWrite(OPERATIONS_LED_B, 0);
+  }
+  else if (operation == MULTIPLY)
+  {
+    // Green = x
+    analogWrite(OPERATIONS_LED_R, 0);
+    analogWrite(OPERATIONS_LED_G, 255);
+    analogWrite(OPERATIONS_LED_B, 0);
+  }
+}
+
+// -------------- PLACE VALUE HELPERS --------------
+int getStepFromPlace(int place)
+{
+  if (place == 0)
+    return 1;
+
+  if (place == 1)
+    return 10;
+
+  if (place == 2)
+    return 100;
+
+  return 1000;
+}
+
+int getDigitAtPlace(int value, int place)
+{
+  int step = getStepFromPlace(place);
+  return (value / step) % 10;
+}
+
+void increaseDigitAtPlace(int &value, int place)
+{
+  int step = getStepFromPlace(place);
+  int digit = getDigitAtPlace(value, place);
+
+  if (digit == 9)
+  {
+    value -= 9 * step;
+  }
+  else
+  {
+    value += step;
+  }
+}
+
+void decreaseDigitAtPlace(int &value, int place)
+{
+  int step = getStepFromPlace(place);
+  int digit = getDigitAtPlace(value, place);
+
+  if (digit == 0)
+  {
+    value += 9 * step;
+  }
+  else
+  {
+    value -= step;
+  }
+}
+
+// -------------- JOYSTICK LOGIC --------------
+bool joystickIsCentered(int value)
+{
+  return value >= JOY_CENTER_LOW && value <= JOY_CENTER_HIGH;
+}
+
+bool handleJoystickA(int xPin, int yPin, int &selectedPlace, int &playerValue, JoystickState &state)
+{
+  int xVal = analogRead(xPin);
+  int yVal = analogRead(yPin);
+
+  bool changed = false;
+
+  if (joystickIsCentered(xVal))
+  {
+    state.xLocked = false;
+  }
+
+  if (joystickIsCentered(yVal))
+  {
+    state.yLocked = false;
+  }
+
+  // Player A:
+  // X axis changes selected digit/place
+  if (!state.xLocked)
+  {
+    if (xVal > JOY_HIGH)
     {
-      int number = digits[0] * 1000 + digits[1] + 100 + digits[2] * 10 + digits[3];
-      display.showNumber(number);
+      selectedPlace++;
+
+      if (selectedPlace > 3)
+        selectedPlace = 0;
+
+      state.xLocked = true;
+      changed = true;
+
+      Serial.print("Player A selected place: ");
+      Serial.println(selectedPlace);
     }
-}
+    else if (xVal < JOY_LOW)
+    {
+      selectedPlace--;
 
+      if (selectedPlace < 0)
+        selectedPlace = 3;
 
-// Method that displays a number in a certain display
-void displayNumber(TM1637TinyDisplay &display, int number) {
-  if (number > 9999 || number < 0) return -1; // cannot show number outside of range
-  int digits[4] = {0, 0, 0, 0};
-  digits[3] = number % 10;
-  digits[2] = (number / 10) % 10;
-  digits[1] = (number / 100) % 10;
-  digits[0] = (number / 1000) % 10;
+      state.xLocked = true;
+      changed = true;
 
-  refreshDisplay(display, digits);
-}
-
-// Method that generates a new operation and displays it
-void newOperation() {
-  int operation = random(4);
-  int first_number;
-  int second_number;
-  switch (currentDifficulty){
-    case EASY:
-      switch (operation){
-        case ADD:
-          first_number = random(100);
-          second_number = random(100);
-          targetAnswer = first_number + second_number;
-        case SUBTRACT:
-          first_number = random(100);
-          second_number = random(first_number + 1);
-          targetAnswer = first_number - second_number;
-        case MULTIPLY:
-          first_number = random(9) + 2;
-          second_number = random(9) + 2;
-          targetAnswer = first_number * second_number;
-        case DIVIDE:
-          do {
-            first_number = random(100);
-            second_number = random(9) + 1;
-          } while (first_number % second_number != 0);
-          targetAnswer = first_number / second_number;
-      }
-    case MEDIUM:
-      switch (operation){
-        case ADD:
-          first_number = random(1000);
-          second_number = random(1000);
-          targetAnswer = first_number + second_number;
-        case SUBTRACT:
-          first_number = random(1000);
-          second_number = random(first_number + 1);
-          targetAnswer = first_number - second_number;
-        case MULTIPLY:
-          do {
-            first_number = random(998) + 2;
-            second_number = random(998) + 2;
-          } while (first_number * second_number > 999);
-          targetAnswer = first_number * second_number;
-        case DIVIDE:
-          do {
-            first_number = random(1000);
-            second_number = random(99) + 1;
-          } while (first_number % second_number != 0);
-          targetAnswer = first_number / second_number;
-      }
-    case HARD:
-      switch (operation){
-        case ADD:
-          first_number = random(10000);
-          second_number = random(9999 - first_number);
-          targetAnswer = first_number + second_number;
-        case SUBTRACT:
-          first_number = random(10000);
-          second_number = random(first_number + 1);
-          targetAnswer = first_number - second_number;
-        case MULTIPLY:
-          do {
-            first_number = random(9998) + 2;
-            second_number = random(9998) + 2;
-          } while (first_number * second_number > 9999);
-          targetAnswer = first_number * second_number;
-        case DIVIDE:
-          do {
-            first_number = random(10000);
-            second_number = random(9999) + 1;
-          } while (first_number % second_number != 0);
-          targetAnswer = first_number / second_number;
-      }
-  }
-  // Reset Player Arrays
-  for (int i = 0; i < 4; i++)
-  {
-      playerA_digits[i] = 0;
-      playerB_digits[i] = 0;
-  }
-
-
-  // Show problem on top displays
-  dispNum1.showNumber(first_number);
-  dispNum2.showNumber(second_number);
-
-  // Clear Player displays to zero
-  refreshDisplay(dispA, playerA_digits);
-  refreshDisplay(dispB, playerB_digits);
-}
-
-// Method that calculates scores based on the current operation and the values on each player's display
-void updateScores() {
-  int valA = (playerA_digits[0] * 1000) + (playerA_digits[1] * 100) + (playerA_digits[2] * 10) + playerA_digits[3];
-  int valB = (playerB_digits[0] * 1000) + (playerB_digits[1] * 100) + (playerB_digits[2] * 10) + playerB_digits[3];
-
-  Serial.println("--- CHECKING ANSWERS ---");
-  
-  if (valA == targetAnswer)
-  {
-      Serial.println("PLAYER A WINS!");
-      playerAScore++;
-      if (playerAScore >= playerBScore) {
-        playerBScore++; // push other player backwards
-      }
-  }
-
-  if (valB == targetAnswer)
-  {
-      Serial.println("PLAYER B WINS!");
-      playerBScore--; // GO BACKWARDS
-      if (playerBScore <= playerAScore) {
-        playerAScore--; // push other player backwards
-      }
-  }
-
-  for (int i = 0; i < 8; i++) {
-    if (i < playerAScore) {
-      leds[i] = CRGB(playerAColor[0], playerAColor[1], playerAColor[2]);
-    }
-    if (NUM_LEDS - 1 - i > playerBScore) {
-      leds[NUM_LEDS - 1 - i] = (CRGB(playerBColor[0], playerBColor[1], playerBColor[2]));
+      Serial.print("Player A selected place: ");
+      Serial.println(selectedPlace);
     }
   }
 
-  if (playerAScore == NUM_LEDS || playerBScore == 0) {
+  // Player A:
+  // Y axis changes value at selected digit/place
+  if (!state.yLocked)
+  {
+    if (yVal < JOY_LOW)
+    {
+      increaseDigitAtPlace(playerValue, selectedPlace);
+
+      state.yLocked = true;
+      changed = true;
+    }
+    else if (yVal > JOY_HIGH)
+    {
+      decreaseDigitAtPlace(playerValue, selectedPlace);
+
+      state.yLocked = true;
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+bool handleJoystickB(int xPin, int yPin, int &selectedPlace, int &playerValue, JoystickState &state)
+{
+  int xVal = analogRead(xPin);
+  int yVal = analogRead(yPin);
+
+  bool changed = false;
+
+  if (joystickIsCentered(xVal))
+  {
+    state.xLocked = false;
+  }
+
+  if (joystickIsCentered(yVal))
+  {
+    state.yLocked = false;
+  }
+
+  // Player B:
+  // Y axis changes selected digit/place
+  // Direction inverted because Player B joystick is flipped
+  if (!state.yLocked)
+  {
+    if (yVal > JOY_HIGH)
+    {
+      selectedPlace--;
+
+      if (selectedPlace < 0)
+        selectedPlace = 3;
+
+      state.yLocked = true;
+      changed = true;
+
+      Serial.print("Player B selected place: ");
+      Serial.println(selectedPlace);
+    }
+    else if (yVal < JOY_LOW)
+    {
+      selectedPlace++;
+
+      if (selectedPlace > 3)
+        selectedPlace = 0;
+
+      state.yLocked = true;
+      changed = true;
+
+      Serial.print("Player B selected place: ");
+      Serial.println(selectedPlace);
+    }
+  }
+
+  // Player B:
+  // X axis changes value at selected digit/place
+  if (!state.xLocked)
+  {
+    if (xVal < JOY_LOW)
+    {
+      decreaseDigitAtPlace(playerValue, selectedPlace);
+
+      state.xLocked = true;
+      changed = true;
+    }
+    else if (xVal > JOY_HIGH)
+    {
+      increaseDigitAtPlace(playerValue, selectedPlace);
+
+      state.xLocked = true;
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+// -------------- BUTTON LOGIC --------------
+bool centralButtonPressed()
+{
+  bool reading = digitalRead(CENTRAL_BUTTON);
+
+  if (reading != lastButtonReading)
+  {
+    lastButtonChangeTime = millis();
+  }
+
+  if ((millis() - lastButtonChangeTime) > buttonDebounceDelay)
+  {
+    if (reading != stableButtonState)
+    {
+      stableButtonState = reading;
+
+      if (stableButtonState == LOW)
+      {
+        lastButtonReading = reading;
+        return true;
+      }
+    }
+  }
+
+  lastButtonReading = reading;
+  return false;
+}
+
+// -------------- NEW OPERATION --------------
+void newOperation()
+{
+  currentOperation = random(3);
+
+  if (currentOperation == ADD)
+  {
+    firstNumber = random(0, 100);
+    secondNumber = random(0, 100);
+    targetAnswer = firstNumber + secondNumber;
+  }
+  else if (currentOperation == SUBTRACT)
+  {
+    firstNumber = random(0, 100);
+    secondNumber = random(0, firstNumber + 1);
+    targetAnswer = firstNumber - secondNumber;
+  }
+  else if (currentOperation == MULTIPLY)
+  {
+    firstNumber = random(2, 13);
+    secondNumber = random(2, 13);
+    targetAnswer = firstNumber * secondNumber;
+  }
+
+  Serial.println("----- NEW OPERATION -----");
+  Serial.print("First number: ");
+  Serial.println(firstNumber);
+  Serial.print("Second number: ");
+  Serial.println(secondNumber);
+  Serial.print("Operation: ");
+  Serial.println(currentOperation);
+  Serial.print("Answer: ");
+  Serial.println(targetAnswer);
+
+  showNumber4(dispNum1, firstNumber);
+  showNumber4(dispNum2, secondNumber);
+
+  setOperationColor(currentOperation);
+
+  playerAValue = 0;
+  playerBValue = 0;
+
+  playerAPlace = 0;
+  playerBPlace = 0;
+
+  showNumber4(dispA, playerAValue);
+  showNumber4(dispB, playerBValue);
+}
+
+// -------------- SCORE LEDS --------------
+void updateLedStrip()
+{
+  FastLED.clear();
+
+  // Player A red lights from the LEFT side
+  for (int i = 0; i < playerAScore; i++)
+  {
+    leds[i] = playerAColor;
+  }
+
+  // Player B blue lights from the RIGHT side
+  for (int i = 0; i < playerBScore; i++)
+  {
+    leds[NUM_LEDS - 1 - i] = playerBColor;
+  }
+
+  FastLED.show();
+}
+// -------------- CHECK ANSWERS --------------
+void checkAnswers()
+{
+  Serial.println("----- CHECKING ANSWERS -----");
+
+  Serial.print("Player A: ");
+  Serial.println(playerAValue);
+
+  Serial.print("Player B: ");
+  Serial.println(playerBValue);
+
+  Serial.print("Correct answer: ");
+  Serial.println(targetAnswer);
+
+  bool playerACorrect = playerAValue == targetAnswer;
+  bool playerBCorrect = playerBValue == targetAnswer;
+
+  if (playerACorrect && playerAScore < POINTS_TO_WIN)
+  {
+    playerAScore++;
+    Serial.println("Player A got it right!");
+  }
+
+  if (playerBCorrect && playerBScore < POINTS_TO_WIN)
+  {
+    playerBScore++;
+    Serial.println("Player B got it right!");
+  }
+
+  updateLedStrip();
+
+  if (playerAScore >= POINTS_TO_WIN || playerBScore >= POINTS_TO_WIN)
+  {
     currentGameState = RESULTS;
   }
+  else
+  {
+    delay(1000);
+    newOperation();
+  }
 }
 
-// -------------- END HELPER METHODS --------------
+// -------------- GAME LOOP --------------
+void gameLoop()
+{
+  bool updateA = handleJoystickA(PA_X, PA_Y, playerAPlace, playerAValue, joystickA);
 
-// -------------- LOOPS --------------
-
-// Loop relevant for things happening during the setup of the game
-void setupLoop() {
-  // Display current operations in operation leds
-  int difficulty = getDifficulty(currentDifficulty);
-
-  // Display current dfficulty index in operation
-  displayNumber(dispNum1, currentDifficulty);
-
-  // Read difficulty buttons to change difficulty
-  if (digitalRead(EASY_BUTTON)) {
-    currentDifficulty = EASY;
+  if (updateA)
+  {
+    showNumber4(dispA, playerAValue);
   }
 
-  if (digitalRead(MEDIUM_BUTTON)) {
-    currentDifficulty = MEDIUM;
+  bool updateB = handleJoystickB(PB_X, PB_Y, playerBPlace, playerBValue, joystickB);
+
+  if (updateB)
+  {
+    showNumber4(dispB, playerBValue);
   }
 
-  if (digitalRead(HARD_BUTTON)) {
-    currentDifficulty = HARD;
+  if (centralButtonPressed())
+  {
+    checkAnswers();
   }
-
-
-  // Read central button value, if 1 go over to game mode
-  if (digitalRead(CENTRAL_BUTTON) == HIGH) {
-    currentGameState = GAME;
-  }
-
 }
 
-// Loop relevant for things happening during the game itself
-void gameLoop() {
-    // Handle Player A Navigation & Input
-    bool updateA = handleJoystick(PA_X, PA_Y, cursorA, playerA_digits);
-    if (updateA)
-        refreshDisplay(dispA, playerA_digits);
+//--------------- RESET THE GAME --------
 
-    // Handle Player B Navigation & Input
-    bool updateB = handleJoystick(PB_X, PB_Y, cursorB, playerB_digits);
-    if (updateB)
-        refreshDisplay(dispB, playerB_digits);
+void resetGame()
+{
+  playerAScore = 0;
+  playerBScore = 0;
 
-    // Check Answer Button (Active LOW)
-    if (digitalRead(CENTRAL_BUTTON) == LOW)
+  playerAValue = 0;
+  playerBValue = 0;
+
+  playerAPlace = 0;
+  playerBPlace = 0;
+
+  currentGameState = GAME;
+
+  FastLED.clear();
+  FastLED.show();
+
+  newOperation();
+}
+
+// -------------- RESULTS LOOP --------------
+void resultsLoop()
+{
+  CRGB winnerColor;
+
+  if (playerAScore >= POINTS_TO_WIN)
+  {
+    winnerColor = playerAColor;
+  }
+  else
+  {
+    winnerColor = playerBColor;
+  }
+
+  // Show 8888 on all displays
+  showNumber4(dispNum1, 8888);
+  showNumber4(dispNum2, 8888);
+  showNumber4(dispA, 8888);
+  showNumber4(dispB, 8888);
+
+  // Blink winner color
+  static unsigned long lastBlinkTime = 0;
+  static bool ledsOn = false;
+
+  if (millis() - lastBlinkTime >= 300)
+  {
+    lastBlinkTime = millis();
+    ledsOn = !ledsOn;
+
+    if (ledsOn)
     {
-        updateScores();
-        delay(2000); // Winner display time
-        newOperation();
+      for (int i = 0; i < NUM_LEDS; i++)
+      {
+        leds[i] = winnerColor;
+      }
     }
-}
+    else
+    {
+      FastLED.clear();
+    }
 
-// Loop relevant for things happening after the game is done
-// TODO
-void resultsLoop() {
-
-  bool playerAWon = playerAScore == NUM_LEDS;
-  int ledColors[3] = {playerBColor[0], playerBColor[1], playerBColor[2]};
-  if (playerAWon) {
-    ledColors[0] = playerAColor[0];
-    ledColors[1] = playerAColor[1];
-    ledColors[2] = playerAColor[2];
+    FastLED.show();
   }
 
-  // Flicker scoring LED's to showcase winning
-
-  // Store current score between the 2 players (could this be stored forever?)
-
-}
-
-// Main Loop (Do not remove!!!)
-void loop() {
-  switch(currentGameState) {
-    case SETUP:
-      setupLoop();
-      break;
-    case GAME:
-      gameLoop();
-      break;
-    case RESULTS:
-      resultsLoop();
-      break;
+  // Press central button to restart
+  if (centralButtonPressed())
+  {
+    resetGame();
   }
 }
 
-// -------------- END LOOPS --------------
+// -------------- MAIN LOOP --------------
+void loop()
+{
+  switch (currentGameState)
+  {
+  case GAME:
+    gameLoop();
+    break;
 
-
+  case RESULTS:
+    resultsLoop();
+    break;
+  }
+}
