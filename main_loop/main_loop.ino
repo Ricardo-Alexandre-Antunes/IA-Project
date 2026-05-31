@@ -6,10 +6,18 @@
 #define ADD 0
 #define SUBTRACT 1
 #define MULTIPLY 2
+#define DIVIDE 3
+
+// -------------- DIFFICULTY CONSTANTS --------------
+#define EASY 0
+#define MEDIUM 1
+#define HARD 2
 
 // -------------- GAME STATE CONSTANTS --------------
-#define GAME 0
-#define RESULTS 1
+#define SELECT_DIFFICULTY 0
+#define COUNTDOWN 1
+#define GAME 2
+#define RESULTS 3
 
 // -------------- PIN CONSTANTS --------------
 #define OPERATION_DISPLAY_1 2
@@ -36,19 +44,19 @@
 CRGB leds[NUM_LEDS];
 
 // -------------- DISPLAYS --------------
-// If a display is upside down, change the final true/false value.
 TM1637TinyDisplay dispNum1(DISPLAY_CLKS, OPERATION_DISPLAY_1, 0, false);
 TM1637TinyDisplay dispNum2(DISPLAY_CLKS, OPERATION_DISPLAY_2, 0, true);
 TM1637TinyDisplay dispA(DISPLAY_CLKS, PLAYER_A_DISPLAY, 0, false);
 TM1637TinyDisplay dispB(DISPLAY_CLKS, PLAYER_B_DISPLAY, 0, true);
 
 // -------------- GAME VARIABLES --------------
-int currentGameState = GAME;
+int currentGameState = SELECT_DIFFICULTY;
+int currentDifficulty = EASY;
 
 int currentOperation = ADD;
-int firstNumber = 0;
-int secondNumber = 0;
-int targetAnswer = 0;
+long firstNumber = 0;
+long secondNumber = 0;
+long targetAnswer = 0;
 
 int playerAValue = 0;
 int playerBValue = 0;
@@ -64,10 +72,7 @@ int playerBPlace = 0;
 int playerAScore = 0;
 int playerBScore = 0;
 
-// Player A = red, left side
 CRGB playerAColor = CRGB::Red;
-
-// Player B = blue, right side
 CRGB playerBColor = CRGB::Blue;
 
 // -------------- JOYSTICK SETTINGS --------------
@@ -90,6 +95,10 @@ bool lastButtonReading = HIGH;
 bool stableButtonState = HIGH;
 unsigned long lastButtonChangeTime = 0;
 const unsigned long buttonDebounceDelay = 50;
+
+// -------------- COUNTDOWN VARIABLES --------------
+unsigned long countdownPreviousTime = 0;
+int countdownStep = 0;
 
 // -------------- SETUP --------------
 void setup()
@@ -115,17 +124,18 @@ void setup()
   dispA.setBrightness(2);
   dispB.setBrightness(2);
 
+  // Your LED strip is GRB, not RGB
   FastLED.addLeds<WS2812, LED_STRIP, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   FastLED.show();
 
   randomSeed(analogRead(A5));
 
-  newOperation();
+  showDifficultySelection();
 }
 
 // -------------- DISPLAY HELPERS --------------
-void showNumber4(TM1637TinyDisplay &display, int number)
+void showNumber4(TM1637TinyDisplay &display, long number)
 {
   if (number < 0)
     number = 0;
@@ -133,8 +143,6 @@ void showNumber4(TM1637TinyDisplay &display, int number)
   if (number > 9999)
     number = 9999;
 
-  // true = show leading zeroes
-  // Example: 1 appears as 0001
   display.showNumber(number, true);
 }
 
@@ -161,6 +169,13 @@ void setOperationColor(int operation)
     analogWrite(OPERATIONS_LED_R, 0);
     analogWrite(OPERATIONS_LED_G, 255);
     analogWrite(OPERATIONS_LED_B, 0);
+  }
+  else if (operation == DIVIDE)
+  {
+    // Purple = /
+    analogWrite(OPERATIONS_LED_R, 255);
+    analogWrite(OPERATIONS_LED_G, 0);
+    analogWrite(OPERATIONS_LED_B, 255);
   }
 }
 
@@ -221,6 +236,9 @@ bool joystickIsCentered(int value)
   return value >= JOY_CENTER_LOW && value <= JOY_CENTER_HIGH;
 }
 
+// Player A:
+// X changes place
+// Y changes value
 bool handleJoystickA(int xPin, int yPin, int &selectedPlace, int &playerValue, JoystickState &state)
 {
   int xVal = analogRead(xPin);
@@ -229,17 +247,11 @@ bool handleJoystickA(int xPin, int yPin, int &selectedPlace, int &playerValue, J
   bool changed = false;
 
   if (joystickIsCentered(xVal))
-  {
     state.xLocked = false;
-  }
 
   if (joystickIsCentered(yVal))
-  {
     state.yLocked = false;
-  }
 
-  // Player A:
-  // X axis changes selected digit/place
   if (!state.xLocked)
   {
     if (xVal > JOY_HIGH)
@@ -251,9 +263,6 @@ bool handleJoystickA(int xPin, int yPin, int &selectedPlace, int &playerValue, J
 
       state.xLocked = true;
       changed = true;
-
-      Serial.print("Player A selected place: ");
-      Serial.println(selectedPlace);
     }
     else if (xVal < JOY_LOW)
     {
@@ -264,14 +273,9 @@ bool handleJoystickA(int xPin, int yPin, int &selectedPlace, int &playerValue, J
 
       state.xLocked = true;
       changed = true;
-
-      Serial.print("Player A selected place: ");
-      Serial.println(selectedPlace);
     }
   }
 
-  // Player A:
-  // Y axis changes value at selected digit/place
   if (!state.yLocked)
   {
     if (yVal < JOY_LOW)
@@ -293,6 +297,9 @@ bool handleJoystickA(int xPin, int yPin, int &selectedPlace, int &playerValue, J
   return changed;
 }
 
+// Player B flipped:
+// Y changes place
+// X changes value
 bool handleJoystickB(int xPin, int yPin, int &selectedPlace, int &playerValue, JoystickState &state)
 {
   int xVal = analogRead(xPin);
@@ -301,18 +308,11 @@ bool handleJoystickB(int xPin, int yPin, int &selectedPlace, int &playerValue, J
   bool changed = false;
 
   if (joystickIsCentered(xVal))
-  {
     state.xLocked = false;
-  }
 
   if (joystickIsCentered(yVal))
-  {
     state.yLocked = false;
-  }
 
-  // Player B:
-  // Y axis changes selected digit/place
-  // Direction inverted because Player B joystick is flipped
   if (!state.yLocked)
   {
     if (yVal > JOY_HIGH)
@@ -324,9 +324,6 @@ bool handleJoystickB(int xPin, int yPin, int &selectedPlace, int &playerValue, J
 
       state.yLocked = true;
       changed = true;
-
-      Serial.print("Player B selected place: ");
-      Serial.println(selectedPlace);
     }
     else if (yVal < JOY_LOW)
     {
@@ -337,14 +334,9 @@ bool handleJoystickB(int xPin, int yPin, int &selectedPlace, int &playerValue, J
 
       state.yLocked = true;
       changed = true;
-
-      Serial.print("Player B selected place: ");
-      Serial.println(selectedPlace);
     }
   }
 
-  // Player B:
-  // X axis changes value at selected digit/place
   if (!state.xLocked)
   {
     if (xVal < JOY_LOW)
@@ -394,44 +386,108 @@ bool centralButtonPressed()
   return false;
 }
 
-// -------------- NEW OPERATION --------------
-void newOperation()
+// -------------- DIFFICULTY SELECTION --------------
+void showDifficultySelection()
 {
-  currentOperation = random(3);
+  FastLED.clear();
 
-  if (currentOperation == ADD)
+  if (currentDifficulty == EASY)
   {
-    firstNumber = random(0, 100);
-    secondNumber = random(0, 100);
-    targetAnswer = firstNumber + secondNumber;
+    showNumber4(dispNum1, 1111);
+    showNumber4(dispNum2, 1111);
+    showNumber4(dispA, 1111);
+    showNumber4(dispB, 1111);
+
+    for (int i = 0; i < 2; i++)
+    {
+      leds[i] = CRGB::Green;
+    }
   }
-  else if (currentOperation == SUBTRACT)
+  else if (currentDifficulty == MEDIUM)
   {
-    firstNumber = random(0, 100);
-    secondNumber = random(0, firstNumber + 1);
-    targetAnswer = firstNumber - secondNumber;
+    showNumber4(dispNum1, 2222);
+    showNumber4(dispNum2, 2222);
+    showNumber4(dispA, 2222);
+    showNumber4(dispB, 2222);
+
+    for (int i = 0; i < 5; i++)
+    {
+      leds[i] = CRGB::Yellow;
+    }
   }
-  else if (currentOperation == MULTIPLY)
+  else if (currentDifficulty == HARD)
   {
-    firstNumber = random(2, 13);
-    secondNumber = random(2, 13);
-    targetAnswer = firstNumber * secondNumber;
+    showNumber4(dispNum1, 3333);
+    showNumber4(dispNum2, 3333);
+    showNumber4(dispA, 3333);
+    showNumber4(dispB, 3333);
+
+    for (int i = 0; i < NUM_LEDS; i++)
+    {
+      leds[i] = CRGB::Red;
+    }
   }
 
-  Serial.println("----- NEW OPERATION -----");
-  Serial.print("First number: ");
-  Serial.println(firstNumber);
-  Serial.print("Second number: ");
-  Serial.println(secondNumber);
-  Serial.print("Operation: ");
-  Serial.println(currentOperation);
-  Serial.print("Answer: ");
-  Serial.println(targetAnswer);
+  FastLED.show();
 
-  showNumber4(dispNum1, firstNumber);
-  showNumber4(dispNum2, secondNumber);
+  analogWrite(OPERATIONS_LED_R, 0);
+  analogWrite(OPERATIONS_LED_G, 0);
+  analogWrite(OPERATIONS_LED_B, 0);
+}
 
-  setOperationColor(currentOperation);
+void handleDifficultyJoystick()
+{
+  int yVal = analogRead(PA_Y);
+
+  if (joystickIsCentered(yVal))
+  {
+    joystickA.yLocked = false;
+  }
+
+  if (!joystickA.yLocked)
+  {
+    if (yVal < JOY_LOW)
+    {
+      currentDifficulty++;
+
+      if (currentDifficulty > HARD)
+        currentDifficulty = EASY;
+
+      joystickA.yLocked = true;
+      showDifficultySelection();
+    }
+    else if (yVal > JOY_HIGH)
+    {
+      currentDifficulty--;
+
+      if (currentDifficulty < EASY)
+        currentDifficulty = HARD;
+
+      joystickA.yLocked = true;
+      showDifficultySelection();
+    }
+  }
+}
+
+void difficultySelectionLoop()
+{
+  handleDifficultyJoystick();
+
+  if (centralButtonPressed())
+  {
+    startCountdown();
+  }
+}
+
+// -------------- COUNTDOWN --------------
+void startCountdown()
+{
+  currentGameState = COUNTDOWN;
+  countdownStep = 0;
+  countdownPreviousTime = millis();
+
+  playerAScore = 0;
+  playerBScore = 0;
 
   playerAValue = 0;
   playerBValue = 0;
@@ -439,8 +495,278 @@ void newOperation()
   playerAPlace = 0;
   playerBPlace = 0;
 
+  joystickA.xLocked = false;
+  joystickA.yLocked = false;
+  joystickB.xLocked = false;
+  joystickB.yLocked = false;
+
+  FastLED.clear();
+  FastLED.show();
+
+  showNumber4(dispNum1, 3);
+  showNumber4(dispNum2, 3);
+  showNumber4(dispA, 3);
+  showNumber4(dispB, 3);
+}
+
+void countdownLoop()
+{
+  unsigned long currentTime = millis();
+
+  if (currentTime - countdownPreviousTime >= 1000)
+  {
+    countdownPreviousTime = currentTime;
+    countdownStep++;
+
+    FastLED.clear();
+
+    if (countdownStep == 1)
+    {
+      showNumber4(dispNum1, 3);
+      showNumber4(dispNum2, 3);
+      showNumber4(dispA, 3);
+      showNumber4(dispB, 3);
+
+      for (int i = 0; i < 2; i++)
+      {
+        leds[i] = CRGB::Red;
+        leds[NUM_LEDS - 1 - i] = CRGB::Red;
+      }
+    }
+    else if (countdownStep == 2)
+    {
+      showNumber4(dispNum1, 2);
+      showNumber4(dispNum2, 2);
+      showNumber4(dispA, 2);
+      showNumber4(dispB, 2);
+
+      for (int i = 0; i < 4; i++)
+      {
+        leds[i] = CRGB::Yellow;
+        leds[NUM_LEDS - 1 - i] = CRGB::Yellow;
+      }
+    }
+    else if (countdownStep == 3)
+    {
+      showNumber4(dispNum1, 1);
+      showNumber4(dispNum2, 1);
+      showNumber4(dispA, 1);
+      showNumber4(dispB, 1);
+
+      for (int i = 0; i < NUM_LEDS; i++)
+      {
+        leds[i] = CRGB::Green;
+      }
+    }
+    else if (countdownStep >= 4)
+    {
+      FastLED.clear();
+      FastLED.show();
+
+      updateLedStrip();
+
+      currentGameState = GAME;
+      newOperation();
+      return;
+    }
+
+    FastLED.show();
+  }
+}
+
+// -------------- OPERATION GENERATION --------------
+
+void generateEasyOperation()
+{
+  currentOperation = random(4);
+
+  if (currentOperation == ADD)
+  {
+    // 1 + 1 up to 99 + 99
+    firstNumber = random(1, 100);
+    secondNumber = random(1, 100);
+    targetAnswer = firstNumber + secondNumber;
+  }
+  else if (currentOperation == SUBTRACT)
+  {
+    // Result can never be negative
+    firstNumber = random(1, 100);
+    secondNumber = random(1, firstNumber + 1);
+    targetAnswer = firstNumber - secondNumber;
+  }
+  else if (currentOperation == MULTIPLY)
+  {
+    // Tabuadas 2 to 10
+    firstNumber = random(2, 11);
+    secondNumber = random(2, 11);
+    targetAnswer = firstNumber * secondNumber;
+  }
+  else if (currentOperation == DIVIDE)
+  {
+    // Two digit number divided by one digit number
+    // Division must be exact and first number must be bigger than second
+    do
+    {
+      firstNumber = random(10, 100);
+      secondNumber = random(1, 10);
+    } while (firstNumber <= secondNumber || firstNumber % secondNumber != 0);
+
+    targetAnswer = firstNumber / secondNumber;
+  }
+}
+
+void generateMediumOperation()
+{
+  currentOperation = random(4);
+
+  if (currentOperation == ADD)
+  {
+    // 1 + 1 up to 999 + 999
+    firstNumber = random(1, 1000);
+    secondNumber = random(1, 1000);
+    targetAnswer = firstNumber + secondNumber;
+  }
+  else if (currentOperation == SUBTRACT)
+  {
+    // Result can never be negative
+    firstNumber = random(1, 1000);
+    secondNumber = random(1, firstNumber + 1);
+    targetAnswer = firstNumber - secondNumber;
+  }
+  else if (currentOperation == MULTIPLY)
+  {
+    // Max result must be 1000
+    do
+    {
+      firstNumber = random(2, 1000);
+      secondNumber = random(2, 1000);
+      targetAnswer = firstNumber * secondNumber;
+    } while (targetAnswer > 1000);
+  }
+  else if (currentOperation == DIVIDE)
+  {
+    // Three digit number divided by one or two digit number
+    // Division must be exact and first number must be bigger than second
+    do
+    {
+      firstNumber = random(100, 1000);
+      secondNumber = random(1, 100);
+    } while (firstNumber <= secondNumber || firstNumber % secondNumber != 0);
+
+    targetAnswer = firstNumber / secondNumber;
+  }
+}
+
+void generateHardOperation()
+{
+  currentOperation = random(4);
+
+  if (currentOperation == ADD)
+  {
+    // Max result 9999
+    firstNumber = random(1, 10000);
+    secondNumber = random(1, 10000 - firstNumber);
+
+    targetAnswer = firstNumber + secondNumber;
+  }
+  else if (currentOperation == SUBTRACT)
+  {
+    // Result can never be negative
+    firstNumber = random(1, 10000);
+    secondNumber = random(1, firstNumber + 1);
+
+    targetAnswer = firstNumber - secondNumber;
+  }
+  else if (currentOperation == MULTIPLY)
+  {
+    // Generate multiplication without overflow
+    // firstNumber * secondNumber can never be bigger than 9999
+    firstNumber = random(2, 10000);
+
+    long maxSecondNumber = 9999 / firstNumber;
+
+    if (maxSecondNumber < 2)
+    {
+      maxSecondNumber = 2;
+      firstNumber = random(2, 100);
+      maxSecondNumber = 9999 / firstNumber;
+    }
+
+    secondNumber = random(2, maxSecondNumber + 1);
+
+    targetAnswer = firstNumber * secondNumber;
+  }
+  else if (currentOperation == DIVIDE)
+  {
+    // Generate clean division directly:
+    // firstNumber / secondNumber = targetAnswer
+    // Max result 9999
+    secondNumber = random(1, 5000);
+    targetAnswer = random(2, (9999 / secondNumber) + 1);
+    firstNumber = secondNumber * targetAnswer;
+
+    // Safety fallback, should rarely be needed
+    if (firstNumber > 9999 || firstNumber <= secondNumber)
+    {
+      secondNumber = random(1, 100);
+      targetAnswer = random(2, 100);
+      firstNumber = secondNumber * targetAnswer;
+    }
+  }
+}
+
+void newOperation()
+{
+  if (currentDifficulty == EASY)
+  {
+    generateEasyOperation();
+  }
+  else if (currentDifficulty == MEDIUM)
+  {
+    generateMediumOperation();
+  }
+  else if (currentDifficulty == HARD)
+  {
+    generateHardOperation();
+  }
+
+  playerAValue = 0;
+  playerBValue = 0;
+
+  playerAPlace = 0;
+  playerBPlace = 0;
+
+  showNumber4(dispNum1, firstNumber);
+  showNumber4(dispNum2, secondNumber);
+
   showNumber4(dispA, playerAValue);
   showNumber4(dispB, playerBValue);
+
+  setOperationColor(currentOperation);
+
+  Serial.println("----- NEW OPERATION -----");
+  Serial.print("Difficulty: ");
+  Serial.println(currentDifficulty);
+
+  Serial.print("First number: ");
+  Serial.println(firstNumber);
+
+  Serial.print("Second number: ");
+  Serial.println(secondNumber);
+
+  Serial.print("Operation: ");
+
+  if (currentOperation == ADD)
+    Serial.println("+");
+  else if (currentOperation == SUBTRACT)
+    Serial.println("-");
+  else if (currentOperation == MULTIPLY)
+    Serial.println("x");
+  else if (currentOperation == DIVIDE)
+    Serial.println("/");
+
+  Serial.print("Answer: ");
+  Serial.println(targetAnswer);
 }
 
 // -------------- SCORE LEDS --------------
@@ -448,13 +774,13 @@ void updateLedStrip()
 {
   FastLED.clear();
 
-  // Player A red lights from the LEFT side
+  // Player A red lights from LEFT side
   for (int i = 0; i < playerAScore; i++)
   {
     leds[i] = playerAColor;
   }
 
-  // Player B blue lights from the RIGHT side
+  // Player B blue lights from RIGHT side
   for (int i = 0; i < playerBScore; i++)
   {
     leds[NUM_LEDS - 1 - i] = playerBColor;
@@ -462,6 +788,7 @@ void updateLedStrip()
 
   FastLED.show();
 }
+
 // -------------- CHECK ANSWERS --------------
 void checkAnswers()
 {
@@ -476,8 +803,8 @@ void checkAnswers()
   Serial.print("Correct answer: ");
   Serial.println(targetAnswer);
 
-  bool playerACorrect = playerAValue == targetAnswer;
-  bool playerBCorrect = playerBValue == targetAnswer;
+  bool playerACorrect = (long)playerAValue == targetAnswer;
+  bool playerBCorrect = (long)playerBValue == targetAnswer;
 
   if (playerACorrect && playerAScore < POINTS_TO_WIN)
   {
@@ -527,8 +854,7 @@ void gameLoop()
   }
 }
 
-//--------------- RESET THE GAME --------
-
+// -------------- RESET GAME --------------
 void resetGame()
 {
   playerAScore = 0;
@@ -540,12 +866,9 @@ void resetGame()
   playerAPlace = 0;
   playerBPlace = 0;
 
-  currentGameState = GAME;
+  currentGameState = SELECT_DIFFICULTY;
 
-  FastLED.clear();
-  FastLED.show();
-
-  newOperation();
+  showDifficultySelection();
 }
 
 // -------------- RESULTS LOOP --------------
@@ -562,13 +885,11 @@ void resultsLoop()
     winnerColor = playerBColor;
   }
 
-  // Show 8888 on all displays
   showNumber4(dispNum1, 8888);
   showNumber4(dispNum2, 8888);
   showNumber4(dispA, 8888);
   showNumber4(dispB, 8888);
 
-  // Blink winner color
   static unsigned long lastBlinkTime = 0;
   static bool ledsOn = false;
 
@@ -592,7 +913,6 @@ void resultsLoop()
     FastLED.show();
   }
 
-  // Press central button to restart
   if (centralButtonPressed())
   {
     resetGame();
@@ -604,6 +924,14 @@ void loop()
 {
   switch (currentGameState)
   {
+  case SELECT_DIFFICULTY:
+    difficultySelectionLoop();
+    break;
+
+  case COUNTDOWN:
+    countdownLoop();
+    break;
+
   case GAME:
     gameLoop();
     break;
